@@ -21,6 +21,14 @@ if [ -f /etc/systemd/system/screensaver-web.service ]; then
     sudo systemctl daemon-reload
     echo "✓ Web admin service removed"
 fi
+if [ -f /etc/systemd/system/wifi-watchdog.service ]; then
+    sudo systemctl disable --now wifi-watchdog.service 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/wifi-watchdog.service /usr/local/bin/wifi-watchdog.py
+    sudo systemctl daemon-reload
+    echo "✓ WiFi watchdog service removed"
+fi
+# Persistent logging (/etc/systemd/journald.conf.d/90-kiosk-persistent.conf)
+# is left in place - it is harmless and keeps logs useful after uninstall
 
 # 2. Kill screensaver processes
 echo "[2/7] Stopping screensaver processes..."

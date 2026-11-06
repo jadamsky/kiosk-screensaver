@@ -607,6 +607,29 @@ echo
 echo "✓ WiFi power save configuration complete"
 
 # ==============================================================================
+# STEP 10: WiFi watchdog and persistent logging
+# ==============================================================================
+echo
+echo "========================================================"
+echo "STEP 10/12: Installing WiFi Watchdog and Persistent Logging"
+echo "========================================================"
+echo
+echo "If the access point rejects the kiosk at boot, NetworkManager can"
+echo "mistake it for a wrong password and stop reconnecting until someone"
+echo "intervenes. The watchdog checks WiFi every 30 seconds and reconnects."
+echo "Persistent logging keeps system logs across reboots for diagnosis."
+echo
+
+bash "$INSTALL_DIR/scripts/enable-persistent-journal.sh" || {
+    echo "⚠ Failed to enable persistent logging (system logs will not survive reboots)"
+}
+
+bash "$INSTALL_DIR/scripts/install-wifi-watchdog.sh" || {
+    echo "⚠ Failed to install WiFi watchdog"
+    echo "  Retry later with: bash $INSTALL_DIR/scripts/install-wifi-watchdog.sh"
+}
+
+# ==============================================================================
 # STEP 11: Generate initial photo list
 # ==============================================================================
 echo

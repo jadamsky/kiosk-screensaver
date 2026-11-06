@@ -37,3 +37,6 @@ screensaver-backup-*/
 
 # Project documentation with personal examples
 context.txt
+
+# Local session handoff notes (contain IPs, SSIDs, hostnames)
+HANDOFF.md

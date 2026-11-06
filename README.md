@@ -17,6 +17,8 @@ Perfect for creating a wall-mounted Home Assistant dashboard that automatically 
 - **Web Admin Panel**: Browser-based configuration interface (port 5000)
 - **Display Power Management**: DDC/CI brightness control, monitor power on/off
 - **WiFi Stability**: Automatic WiFi power save disable to prevent network dropouts
+- **WiFi Watchdog**: Automatically reconnects if WiFi fails to come back after a reboot or drops out
+- **Persistent Logging**: System logs survive reboots, so failures can be diagnosed afterwards
 - **Auto Photo List Generation**: Scheduled regeneration of photo catalog
 - **Privacy Mode**: Optional blank screen instead of photos
 - **Scheduled Reboots**: Automatic system maintenance reboots
@@ -94,8 +96,9 @@ The installer will:
 4. Configure auto-start for labwc, Chromium, and screensaver
 5. Set up web admin panel
 6. **Disable WiFi power save** to prevent network dropouts
-7. Generate initial photo list
-8. Configure permissions and systemd services
+7. **Install the WiFi watchdog** and enable persistent system logging
+8. Generate initial photo list
+9. Configure permissions and systemd services
 
 ### 5. Reboot
 
@@ -372,6 +375,55 @@ bash ~/kiosk-screensaver/scripts/disable-wifi-powersave.sh
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed analysis of this issue.
 
+### Kiosk doesn't reconnect to WiFi after a reboot
+
+**Symptoms:**
+- After a reboot the display comes up, but the kiosk is unreachable on the network
+- `nmcli device` shows `wlan0` as `disconnected` and it never reconnects on its own
+- Running `sudo nmcli connection up <your-wifi-name>` by hand fixes it immediately
+
+**Cause:** If the access point briefly rejects the kiosk or times out the
+WPA handshake while it is connecting (for example while the router is busy),
+NetworkManager can treat the failure as a wrong password. With no one there
+to enter a new one, it marks the connection as failed (`no-secrets`) and
+stops auto-connecting until someone reconnects manually.
+
+**Fix:** The installer sets up `wifi-watchdog.service`, which checks every
+30 seconds that `wlan0` has an address and can reach its gateway, and
+reconnects if not. To install it on an existing system:
+```bash
+bash ~/kiosk-screensaver/scripts/install-wifi-watchdog.sh
+```
+
+```bash
+# Check the watchdog is running
+systemctl status wifi-watchdog
+
+# See what it has done (failures and recoveries only - quiet when healthy)
+journalctl -u wifi-watchdog
+
+# One-shot link check
+sudo python3 /usr/local/bin/wifi-watchdog.py --check
+```
+
+### Logs disappear after a reboot
+
+Raspberry Pi OS keeps system logs in memory only by default, so a reboot or
+power cut erases the evidence of whatever went wrong. The installer enables
+persistent logging (capped at 200MB). To enable it on an existing system:
+```bash
+bash ~/kiosk-screensaver/scripts/enable-persistent-journal.sh
+
+# After a reboot, view the previous boot's logs
+journalctl --list-boots
+journalctl -b -1
+```
+
+Note: setting `Storage=persistent` in `/etc/systemd/journald.conf` alone has
+no effect on Raspberry Pi OS, because a drop-in shipped with the OS
+(`/usr/lib/systemd/journald.conf.d/40-rpi-volatile-storage.conf`) overrides
+it. The script adds its own drop-in that takes precedence.
+
 ### Web admin not accessible
 
 ```bash
@@ -502,13 +554,16 @@ features:
 │   └── web/               # Web admin panel
 ├── static/                 # HTML/JS for slideshow
 ├── scripts/                # Utility scripts
-│   ├── disable-wifi-powersave.sh  # WiFi stability fix
-│   └── diagnose-offline.sh        # Network diagnostic tool
+│   ├── disable-wifi-powersave.sh    # WiFi stability fix
+│   ├── wifi-watchdog.py             # WiFi auto-reconnect watchdog
+│   ├── install-wifi-watchdog.sh     # Installs the watchdog service
+│   ├── enable-persistent-journal.sh # Keeps system logs across reboots
+│   └── diagnose-offline.sh          # Network diagnostic tool
 └── force-night-screensaver.sh     # Movie mode script
 
 Note: Systemd service files (/etc/systemd/system/disable-wifi-powersave.service,
-screensaver-web.service) and sudoers configuration are generated automatically
-by the installer with your specific user and paths.
+wifi-watchdog.service, screensaver-web.service) and sudoers configuration are
+generated automatically by the installer with your specific user and paths.
 ```
 
 ## Credits
